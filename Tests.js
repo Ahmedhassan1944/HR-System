@@ -89,7 +89,8 @@ function _restoreMocks() {
 const CANDIDATE_HEADERS = [
   'CandidateID', 'FullName', 'Position', 'Department', 'Email',
   'Phone', 'Nationality', 'OfferSalary', 'AssignedCoordinatorEmail',
-  'CurrentStatus', 'CreatedAt', 'UpdatedAt', 'DriveFolderID'
+  'CurrentStatus', 'CreatedAt', 'UpdatedAt', 'DriveFolderID',
+  'Notes', 'LocalServerPath', 'HR_Code', 'Recruitment_Type', 'Batch_Number'
 ];
 
 const DOCUMENT_HEADERS = [
@@ -103,8 +104,15 @@ const LOG_HEADERS = [
 
 const USER_HEADERS = ['UserID', 'Email', 'Role', 'Name'];
 
+const EVENT_HEADERS = [
+  'EventID', 'CandidateID', 'CandidateName', 'Title', 'Description',
+  'EventDate', 'EventTime', 'Priority', 'ReminderMinutesBefore',
+  'Status', 'GoogleCalendarEventId', 'GoogleCalendarLink',
+  'CreatedBy', 'CreatedAt', 'UpdatedAt'
+];
+
 /**
- * Seeds all four sheets with minimal valid data for a test run.
+ * Seeds all five sheets with minimal valid data for a test run.
  */
 function _seedAllSheets() {
   MockFactory.reset();
@@ -112,7 +120,8 @@ function _seedAllSheets() {
   MockFactory.seedSheet(SHEET_CANDIDATES, CANDIDATE_HEADERS, [
     ['cand-001', 'Ahmed Ali', 'Engineer', 'Projects', 'ahmed@test.com',
      '+201012345678', 'Egyptian', '350', 'coord@company.com',
-     'Documents Requested', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', '']
+     'Documents Requested', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z',
+     '', '', '', '', '']
   ]);
 
   MockFactory.seedSheet(SHEET_DOCUMENTS, DOCUMENT_HEADERS, [
@@ -128,6 +137,8 @@ function _seedAllSheets() {
   MockFactory.seedSheet(SHEET_USERS, USER_HEADERS, [
     ['user-001', 'test.user@yourcompany.com', 'Admin', 'Test Admin']
   ]);
+
+  MockFactory.seedSheet(SHEET_EVENTS, EVENT_HEADERS); // no rows — empty events sheet
 }
 
 
@@ -312,7 +323,8 @@ function suite_Database_Candidates() {
     MockFactory.seedSheet(SHEET_CANDIDATES, CANDIDATE_HEADERS, [
       ['cand-001', 'Ahmed Ali', 'Engineer', 'Projects', 'ahmed@test.com',
        '+201012345678', 'Egyptian', '350', 'coord@company.com',
-       'Documents Requested', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', '']
+       'Documents Requested', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z',
+       '', '', '', '', '']
     ]);
     MockFactory.seedSheet(SHEET_DOCUMENTS, DOCUMENT_HEADERS, []);
     MockFactory.seedSheet(SHEET_LOGS,      LOG_HEADERS,      []);
@@ -352,13 +364,12 @@ function suite_Database_Documents() {
   });
 
   // ── api_reviewDocument tests ──────────────────────────────────────────────
-  // TODO (Prompt 3): These tests are disabled until api_reviewDocument is built
-  //                  in Database.js. Re-enable them after applying Prompt 3.
+  // api_reviewDocument is now implemented in Database.js.
+  // Active tests can be added here for approval/rejection workflows.
   // ─────────────────────────────────────────────────────────────────────────
 
-  TestRunner.run('[PENDING Prompt 3] api_reviewDocument — tests skipped until backend function is built', () => {
-    // Intentionally left empty — will be filled in when Prompt 3 is applied.
-    Assert.isTrue(true, 'placeholder always passes');
+  TestRunner.run('api_reviewDocument — backend function exists', () => {
+    Assert.isTrue(typeof api_reviewDocument === 'function', 'api_reviewDocument should be a function in Database.js');
   });
 }
 

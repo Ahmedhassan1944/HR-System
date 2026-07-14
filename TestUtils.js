@@ -185,6 +185,13 @@ const MockFactory = {
           return null; // Simulates missing sheet
         }
         return MockFactory._sheets[name];
+      },
+      insertSheet: (name) => {
+        // Auto-create a mock sheet when getEventsSheet_() calls insertSheet
+        if (!MockFactory._sheets[name]) {
+          MockFactory.seedSheet(name, []);
+        }
+        return MockFactory._sheets[name];
       }
     })
   }),
@@ -215,7 +222,15 @@ const MockFactory = {
       getFolderById:    (id) => {
         // Find folder across all roots by folderId
         const all = Object.values(MockFactory._driveFolders);
-        return all.find(f => f.getId() === id) || MockFactory._makeMockFolder('retrieved-' + id);
+        const found = all.find(f => f.getId() === id);
+        if (found) return found;
+        // Create a named folder with this ID and track it
+        const fallbackName = 'retrieved-' + id;
+        const folder = MockFactory._makeMockFolder(fallbackName);
+        // Override the generated ID with the requested one
+        folder.getId = () => id;
+        MockFactory._driveFolders[fallbackName] = folder;
+        return folder;
       },
       Access: { PRIVATE: 'PRIVATE' },
       Permission: { NONE: 'NONE' }

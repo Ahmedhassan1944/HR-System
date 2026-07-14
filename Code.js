@@ -156,6 +156,20 @@ function api_getDashboardData() {
       });
     });
     
+    // ── Pending Validation counter ──────────────────────────────────
+    // Count of distinct candidates who have at least one document with
+    // ApprovalStatus === 'Pending Review' (uploaded but not yet reviewed).
+    const candPendingValidation = new Set();
+    allDocs.forEach(doc => {
+      if ((doc.ApprovalStatus || '').trim() === 'Pending Review') {
+        const key = (doc.CandidateID || '').trim();
+        if (candDocMap[key]) {
+          candPendingValidation.add(key);
+        }
+      }
+    });
+    const pendingValidation = candPendingValidation.size;
+    
     // ── Calendar-based counters ────────────────────────────────────
     const todayDate = new Date();
     todayDate.setHours(0,0,0,0);
@@ -195,6 +209,8 @@ function api_getDashboardData() {
         pendingMedical,
         bookedMedical,
         docsUnderPreparing,
+        // Document Pending Validation
+        pendingValidation,
         // Document HAS counts
         hasPassport:      hasCount['Passport'],
         hasPhoto:         hasCount['Photo'],

@@ -179,6 +179,7 @@
           // Status-based
           activeCount: 24, missingDocs: 9, visaPending: 6, visaCompleted: 4, mobilized: 8,
           pendingMedical: 3, bookedMedical: 2, docsUnderPreparing: 4,
+          pendingValidation: 5,
           // Has counts
           hasPassport: 18, hasPhoto: 14, hasAcademicCert: 12,
           hasMedicalExam: 10, hasMedicalAnalysis: 8, hasVisa: 6, hasCV: 15,
@@ -617,10 +618,9 @@
 
       // Track selected card filters
       Views._dashboardSelectedCards = new Set();
-      Views._dashStatusFilters       = [];
+      Views._dashStatusFilters        = [];
       Views._dashExcludeStatusFilters = [];
-      Views._dashDocFilters          = [];
-      Views._dashDocFilters          = [];
+      Views._dashDocFilters           = [];
       Views._refreshDashboard();
     },
 

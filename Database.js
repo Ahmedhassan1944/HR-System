@@ -339,6 +339,53 @@ function api_getDocumentsByCandidate(candidateId) {
 }
 
 /**
+ * Reviews (approves or rejects) a candidate's document.
+ * @param {string} candidateId
+ * @param {string} documentId
+ * @param {string} approvalStatus - 'Approved' or 'Rejected'
+ * @param {string} [remarks] - Optional reviewer remarks
+ */
+function api_reviewDocument(candidateId, documentId, approvalStatus, remarks) {
+  const auth = requireRole_(['Admin', 'HR']);
+  if (!auth.authorized) return { success: false, error: auth.error };
+
+  const ALLOWED_REVIEW_STATUSES = new Set(['Approved', 'Rejected']);
+  if (!ALLOWED_REVIEW_STATUSES.has(approvalStatus)) {
+    return { success: false, error: 'Invalid approval status. Must be Approved or Rejected.' };
+  }
+
+  try {
+    const sheet = getSheet_(SHEET_DOCUMENTS);
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0];
+    const docIdCol = headers.indexOf('DocumentID');
+    const candIdCol = headers.indexOf('CandidateID');
+    const statusCol = headers.indexOf('ApprovalStatus');
+    const approvedByCol = headers.indexOf('ApprovedBy');
+    const remarksCol = headers.indexOf('Remarks');
+
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][docIdCol] === documentId && data[i][candIdCol] === candidateId) {
+        sheet.getRange(i + 1, statusCol + 1).setValue(approvalStatus);
+        sheet.getRange(i + 1, approvedByCol + 1).setValue(Session.getActiveUser().getEmail());
+        if (remarks !== undefined) {
+          sheet.getRange(i + 1, remarksCol + 1).setValue(remarks);
+        }
+        api_writeLog_(candidateId, Session.getActiveUser().getEmail(),
+          'Document ' + approvalStatus + ': ' + data[i][headers.indexOf('DocType')]);
+        // [CACHE POLICY] Write operation — invalidate dashboard cache immediately
+        CacheService.getScriptCache().remove('dashboard_data');
+        return { success: true };
+      }
+    }
+    return { success: false, error: 'Document not found for this candidate.' };
+  } catch (e) {
+    Logger.log(e);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
  * Returns ALL document records across all candidates.
  * Used by api_getDashboardData for doc-level KPI aggregation.
  */

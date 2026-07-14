@@ -172,7 +172,7 @@ function api_writeDocumentRecord_(candidateId, docType, fileName, fileUrl, mimeT
     fileName,           // FileName
     fileUrl,            // FileURL
     now,                // UploadDate
-    'Approved',         // ApprovalStatus
+    'Pending Review',   // ApprovalStatus (starts as Pending Review, not auto-approved)
     'SYSTEM',           // ApprovedBy
     versionNumber,      // VersionNumber
     ''                  // Remarks
