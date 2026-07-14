@@ -121,7 +121,7 @@ function _seedAllSheets() {
     ['cand-001', 'Ahmed Ali', 'Engineer', 'Projects', 'ahmed@test.com',
      '+201012345678', 'Egyptian', '350', 'coord@company.com',
      'Documents Requested', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z',
-     '', '', '', '', '']
+     '', '', '', '', '', '']
   ]);
 
   MockFactory.seedSheet(SHEET_DOCUMENTS, DOCUMENT_HEADERS, [
@@ -150,6 +150,7 @@ function suite_Code() {
   Logger.log('\n── Suite: Code.gs ──────────────────────────────');
 
   TestRunner.run('api_getDashboardData returns success object', () => {
+    _seedAllSheets();
     const result = api_getDashboardData();
     Assert.isTrue(result.success, 'success should be true');
     Assert.notNull(result.data, 'data should not be null');
@@ -159,6 +160,7 @@ function suite_Code() {
   });
 
   TestRunner.run('api_getDashboardData returns correct KPI values for seeded data', () => {
+    _seedAllSheets();
     // Seed 1 candidate with status 'Documents Requested' (see _seedAllSheets)
     // activeCount  = 1 (all non-Closed)
     // missingDocs  = 1 ('Documents Requested' is in MISSING_DOC_STATUSES)
@@ -324,7 +326,7 @@ function suite_Database_Candidates() {
       ['cand-001', 'Ahmed Ali', 'Engineer', 'Projects', 'ahmed@test.com',
        '+201012345678', 'Egyptian', '350', 'coord@company.com',
        'Documents Requested', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z',
-       '', '', '', '', '']
+       '', '', '', '', '', '']
     ]);
     MockFactory.seedSheet(SHEET_DOCUMENTS, DOCUMENT_HEADERS, []);
     MockFactory.seedSheet(SHEET_LOGS,      LOG_HEADERS,      []);

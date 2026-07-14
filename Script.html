@@ -17,7 +17,7 @@
 
   const App = {
     state: {
-      currentUser: { name: 'HR Coordinator', role: 'HR_COORDINATOR', email: '' },
+      currentUser: { name: '', role: null, email: '' },
       currentView: 'dashboard',
       candidates: [],
       filteredCandidates: [],
@@ -91,7 +91,13 @@
     call(fnName, ...args) {
       return new Promise((resolve, reject) => {
         if (!this.isLive) {
-          resolve(this._mockData(fnName, ...args));
+          setTimeout(() => {
+            try {
+              resolve(this._mockData(fnName, ...args));
+            } catch (e) {
+              reject(e);
+            }
+          }, 0);
           return;
         }
         let call = google.script.run
@@ -172,6 +178,11 @@
         { LogID: 'l-3', Timestamp: '2026-06-02T08:05:00Z', CandidateID: 'c-001', Actor: 'ahmed@test.com', Event: 'Document Uploaded: Passport' },
         { LogID: 'l-4', Timestamp: '2026-06-03T10:00:00Z', CandidateID: 'c-001', Actor: 'hr@company.com', Event: 'Document Approved: Passport' },
       ];
+
+      if (fnName === 'api_getCurrentUser') return {
+        success: true,
+        data: { email: 'hr@example.com', name: 'HR User', role: 'HR' }
+      };
 
       if (fnName === 'api_getDashboardData') return {
         success: true,
@@ -337,6 +348,10 @@
 
   const Router = {
     navigate(view, params = {}) {
+      if (view === 'login') {
+        this.navigate('dashboard', params);
+        return;
+      }
       App.setState({ currentView: view, ...params });
       renderSidebar();
       renderView();
@@ -3181,6 +3196,25 @@
   // ─────────────────────────────────────────────
 
   const initApp = () => {
+    // Fetch real user role first — RBAC controls depend on this
+    GAS.call('api_getCurrentUser')
+      .then(result => {
+        if (result && result.success && result.data) {
+          App.setState({
+            currentUser: {
+              role: result.data.role,
+              email: result.data.email,
+              name: result.data.name
+            }
+          });
+          renderTopbar();
+          renderSidebar();
+        }
+      })
+      .catch(() => {
+        console.warn('[Auth] Could not fetch user role — RBAC UI may be inaccurate.');
+      });
+
     // Resolve current user email if in GAS environment
     if (GAS.isLive && typeof google !== 'undefined') {
       try {
