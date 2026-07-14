@@ -260,6 +260,94 @@ function api_updateCandidateDetails(candidateId, updates) {
 }
 
 /**
+ * Permanently deletes a candidate and ALL associated data:
+ *   - Row in tbl_Candidates
+ *   - All rows in tbl_Documents  where CandidateID matches
+ *   - All rows in tbl_Events     where CandidateID matches
+ *   - All rows in tbl_SystemLogs where CandidateID matches
+ *   - Candidate's Google Drive folder (moved to Trash)
+ * Restricted to Admin and HR roles only.
+ */
+function api_deleteCandidate(candidateId) {
+  const auth = requireRole_(['Admin', 'HR']);
+  if (!auth.authorized) return { success: false, error: auth.error };
+  if (!candidateId) return { success: false, error: 'candidateId is required.' };
+
+  try {
+    const ss = getSpreadsheet_();
+
+    let driveFolderId = '';
+    (function () {
+      const sheet   = ss.getSheetByName(SHEET_CANDIDATES);
+      const data    = sheet.getDataRange().getValues();
+      const idCol   = data[0].indexOf('CandidateID');
+      const fldCol  = data[0].indexOf('DriveFolderID');
+      // Iterate bottom-up so row indices stay valid after deletion
+      for (let i = data.length - 1; i >= 1; i--) {
+        if (String(data[i][idCol]) === String(candidateId)) {
+          driveFolderId = data[i][fldCol] || '';
+          sheet.deleteRow(i + 1);
+          break;
+        }
+      }
+    })();
+
+    (function () {
+      const sheet  = ss.getSheetByName(SHEET_DOCUMENTS);
+      const data   = sheet.getDataRange().getValues();
+      const idCol  = data[0].indexOf('CandidateID');
+      for (let i = data.length - 1; i >= 1; i--) {
+        if (String(data[i][idCol]) === String(candidateId)) sheet.deleteRow(i + 1);
+      }
+    })();
+
+    (function () {
+      const sheet  = ss.getSheetByName(SHEET_EVENTS);
+      const data   = sheet.getDataRange().getValues();
+      const idCol  = data[0].indexOf('CandidateID');
+      for (let i = data.length - 1; i >= 1; i--) {
+        if (String(data[i][idCol]) === String(candidateId)) sheet.deleteRow(i + 1);
+      }
+    })();
+
+    (function () {
+      const sheet  = ss.getSheetByName(SHEET_LOGS);
+      const data   = sheet.getDataRange().getValues();
+      const idCol  = data[0].indexOf('CandidateID');
+      for (let i = data.length - 1; i >= 1; i--) {
+        if (String(data[i][idCol]) === String(candidateId)) sheet.deleteRow(i + 1);
+      }
+    })();
+
+    if (driveFolderId) {
+      try {
+        DriveApp.getFolderById(driveFolderId).setTrashed(true);
+      } catch (driveErr) {
+        // Non-fatal: folder may already be deleted or inaccessible
+        Logger.log('Drive folder trash warning: ' + driveErr.message);
+      }
+    }
+
+    const cache = CacheService.getScriptCache();
+    cache.removeAll([
+      'dashboard_data',
+      'all_candidates',
+      'all_documents',
+      'all_upcoming_events',
+      'docs_'    + candidateId,
+      'events_'  + candidateId
+    ]);
+
+    Logger.log('Candidate permanently deleted: ' + candidateId);
+    return { success: true };
+
+  } catch (e) {
+    Logger.log('api_deleteCandidate error: ' + e.message);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
  * Updates a candidate's status.
  * @param {string} candidateId
  * @param {string} newStatus
@@ -334,6 +422,81 @@ function api_getDocumentsByCandidate(candidateId) {
     return { success: true, data: documents };
   } catch (e) {
     Logger.log(e);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Permanently deletes a single document:
+ *   - Removes its row from tbl_Documents (matched by DocumentID)
+ *   - Moves the actual Drive file to Trash (extracted from FileURL)
+ *   - Invalidates related caches
+ *   - Writes an audit log entry
+ * Restricted to Admin and HR roles only.
+ */
+function api_deleteDocument(documentId, candidateId) {
+  const auth = requireRole_(['Admin', 'HR']);
+  if (!auth.authorized) return { success: false, error: auth.error };
+  if (!documentId)  return { success: false, error: 'documentId is required.' };
+  if (!candidateId) return { success: false, error: 'candidateId is required.' };
+
+  try {
+    const sheet   = getSheet_(SHEET_DOCUMENTS);
+    const data    = sheet.getDataRange().getValues();
+    const headers = data[0];
+    const idCol   = headers.indexOf('DocumentID');
+    const urlCol  = headers.indexOf('FileURL');
+    const typeCol = headers.indexOf('DocType');
+
+    let fileURL = '';
+    let docType = '';
+    let found   = false;
+
+    // Iterate bottom-up to keep row indices valid after deletion
+    for (let i = data.length - 1; i >= 1; i--) {
+      if (String(data[i][idCol]) === String(documentId)) {
+        fileURL = data[i][urlCol] || '';
+        docType = data[i][typeCol] || 'Document';
+        sheet.deleteRow(i + 1);
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) return { success: false, error: 'Document not found.' };
+
+    // Drive file URLs come in two forms:
+    //   https://drive.google.com/file/d/FILE_ID/view
+    //   https://drive.google.com/open?id=FILE_ID
+    if (fileURL && fileURL !== '#') {
+      try {
+        const match = fileURL.match(/\/d\/([a-zA-Z0-9_-]{10,})/) ||
+                      fileURL.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+        if (match && match[1]) {
+          DriveApp.getFileById(match[1]).setTrashed(true);
+        }
+      } catch (driveErr) {
+        // Non-fatal — file may already be deleted or user lacks Drive access
+        Logger.log('Drive file trash warning: ' + driveErr.message);
+      }
+    }
+
+    api_writeLog_(
+      candidateId,
+      Session.getActiveUser().getEmail(),
+      'Document Deleted: ' + docType + ' (ID: ' + documentId + ')'
+    );
+
+    CacheService.getScriptCache().removeAll([
+      'dashboard_data',
+      'all_documents',
+      'docs_' + candidateId
+    ]);
+
+    return { success: true };
+
+  } catch (e) {
+    Logger.log('api_deleteDocument error: ' + e.message);
     return { success: false, error: e.message };
   }
 }

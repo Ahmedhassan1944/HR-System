@@ -1,4 +1,4 @@
-﻿<script>
+<script>
   /**
    * =========================================================
    * ENTERPRISE HR MOBILIZATION — FRONTEND SPA (Script.html)
@@ -217,6 +217,8 @@
       if (fnName === 'api_updateCalendarEvent') return { success: true };
       if (fnName === 'api_deleteCalendarEvent') return { success: true };
       if (fnName === 'api_markEventCompleted') return { success: true };
+      if (fnName === 'api_deleteCandidate') return { success: true };
+      if (fnName === 'api_deleteDocument') return { success: true };
       return { success: true };
     }
   };
@@ -1984,6 +1986,9 @@
           <button class="btn btn--primary" onclick="Views._openUploadModal('${escHtml(c.CandidateID)}','${escHtml(c.DriveFolderID || '')}')">
             📤 Upload Document
           </button>
+          <button class="btn btn--danger btn--sm" onclick="Views._confirmDeleteCandidate('${escHtml(c.CandidateID)}','${escHtml(c.FullName)}')">
+            🗑️ Delete
+          </button>
         </div>
       </div>
 
@@ -2163,6 +2168,12 @@
           <div style="margin:0 var(--sp-2)">${statusBadge(d.ApprovalStatus)}</div>
           <div class="doc-row__actions">
             ${d.FileURL && d.FileURL !== '#' ? `<a href="${escHtml(d.FileURL)}" target="_blank" rel="noopener" class="btn btn--outline btn--sm" aria-label="View ${escHtml(d.DocType)}">View ↗</a>` : ''}
+            <button
+              class="btn btn--danger btn--sm"
+              aria-label="Delete ${escHtml(d.DocType)}"
+              onclick="Views._confirmDeleteDocument('${escHtml(d.DocumentID)}','${escHtml(d.CandidateID)}','${escHtml(d.DocType)}','${escHtml(d.FileName)}')">
+              🗑️
+            </button>
           </div>
         </div>`).join('');
       } catch (err) {
@@ -3158,6 +3169,89 @@
       } catch (err) {
         Toast.error('An unexpected error occurred.');
       }
+    },
+
+    _confirmDeleteDocument(documentId, candidateId, docType, fileName) {
+      Modal.open(`
+        <div class="modal__header">
+          <h2 class="modal__title">🗑️ Delete Document</h2>
+          <button class="modal__close" onclick="Modal.close()">×</button>
+        </div>
+        <div class="modal__body">
+          <p>Are you sure you want to permanently delete:</p>
+          <p style="margin-top:var(--sp-2);font-weight:600">${escHtml(docType)} — ${escHtml(fileName)}</p>
+          <p style="color:var(--c-danger);margin-top:var(--sp-2);font-size:.875rem">
+            ⚠️ The file will be removed from Google Drive and cannot be recovered.
+          </p>
+        </div>
+        <div class="modal__footer">
+          <button class="btn btn--outline" onclick="Modal.close()">Cancel</button>
+          <button class="btn btn--danger" id="btn-confirm-delete-doc">Yes, Delete</button>
+        </div>
+      `);
+      document.getElementById('btn-confirm-delete-doc').onclick = async () => {
+        try {
+          Modal.close();
+          App.setState({ loading: true });
+          renderTopbar();
+          const res = await GAS.call('api_deleteDocument', documentId, candidateId);
+          if (res.success) {
+            Toast.success(escHtml(docType) + ' deleted successfully.');
+            // Reload documents section in place — no full page reload needed
+            await Views._loadCandidateDocuments(candidateId);
+          } else {
+            Toast.error(res.error || 'Delete failed. Please try again.');
+          }
+        } catch (e) {
+          Toast.error(e.message);
+        } finally {
+          App.setState({ loading: false });
+          renderTopbar();
+        }
+      };
+    },
+
+    _confirmDeleteCandidate(candidateId, candidateName) {
+      Modal.open(`
+        <div class="modal__header">
+          <h2 class="modal__title">🗑️ Delete Candidate</h2>
+          <button class="modal__close" onclick="Modal.close()">×</button>
+        </div>
+        <div class="modal__body">
+          <p>Are you sure you want to <strong>permanently delete</strong> <strong>${escHtml(candidateName)}</strong>?</p>
+          <p style="color:var(--c-danger);margin-top:var(--sp-2);font-size:.9rem">
+            ⚠️ This will erase the candidate, all their documents, all follow-up events,
+            and the audit log from the database and Google Drive — with no way to recover them.
+          </p>
+        </div>
+        <div class="modal__footer">
+          <button class="btn btn--outline" onclick="Modal.close()">Cancel</button>
+          <button class="btn btn--danger" id="btn-confirm-delete-candidate">Yes, Delete Permanently</button>
+        </div>
+      `);
+      document.getElementById('btn-confirm-delete-candidate').onclick = async () => {
+        try {
+          Modal.close();
+          App.setState({ loading: true });
+          renderTopbar();
+          const res = await GAS.call('api_deleteCandidate', candidateId);
+          if (res.success) {
+            App.setState({
+              candidates: App.state.candidates.filter(c => c.CandidateID !== candidateId),
+              selectedCandidate: null
+            });
+            Toast.success('Candidate deleted permanently.');
+            Router.navigate('candidates');
+          } else {
+            Toast.error(res.error || 'Delete failed. Please try again.');
+          }
+        } catch (e) {
+          Toast.error(e.message);
+        } finally {
+          App.setState({ loading: false });
+          renderTopbar();
+        }
+      };
     },
 
     async _deleteEvent(eventId) {
